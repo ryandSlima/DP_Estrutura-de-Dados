@@ -1,0 +1,196 @@
+// Bibliotecas necessárias para a funcionalidade do programa
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+// Definimos o tamanho máximo da nossa Blockchain
+#define MAX_BLOCOS 10
+
+// --- ESTRUTURA DO BLOCO DE REGISTRO DE DESCARTE ---
+typedef struct {
+    int id;               // ID do Bloco
+    int hash_anterior;    // O HASH do bloco anterior na cadeia
+
+    // Dados do Registro de Descarte (Transações do Bloco)
+    char Modelo[100];
+    char Motivo[100];
+    char Destino[100];
+    char Data[10];
+    char Nome[100];
+    int SN;
+
+    int hash_atual;       // O HASH deste bloco
+} Bloco;
+
+// --- VARIÁVEIS GLOBAIS DA BLOCKCHAIN ---
+Bloco blockchain[MAX_BLOCOS];
+int proximo_id = 0;
+int hash_anterior_atual = 0; // Começa em 0 (para o Bloco Gênesis)
+char Senha[100], Tentativa[100];
+int confirmacao, confirmacao2, QtdTentativa = 1;
+
+
+// --- FUNÇÃO HASH INTEGRADA PARA O BLOCO ---
+// Esta função calcula a "impressão digital" de um bloco.
+int calcularHashBloco(Bloco *bloco) {
+    unsigned long hash_calculado = 5381; // djb2 seed
+
+    // 1. Inclui os inteiros (ID, Hash Anterior, SN) no cálculo
+    hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->id;
+    hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->hash_anterior;
+    hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->SN;
+
+    // 2. Inclui as strings no cálculo
+    for (int i = 0; bloco->Nome[i] != '\0'; i++) hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->Nome[i];
+    for (int i = 0; bloco->Data[i] != '\0'; i++) hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->Data[i];
+    for (int i = 0; bloco->Modelo[i] != '\0'; i++) hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->Modelo[i];
+    for (int i = 0; bloco->Motivo[i] != '\0'; i++) hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->Motivo[i];
+    for (int i = 0; bloco->Destino[i] != '\0'; i++) hash_calculado = ((hash_calculado << 5) + hash_calculado) + bloco->Destino[i];
+
+    // Usa um módulo para manter o valor como um INT simples para este exemplo
+    return (int)(hash_calculado % 99999);
+}
+
+
+// --- FUNÇÃO PARA ADICIONAR UM NOVO BLOCO À CADEIA ---
+void adicionarNovoBloco(char *nome, int sn, char *data, char *modelo, char *motivo, char *destino) {
+    if (proximo_id >= MAX_BLOCOS) {
+        printf("\n Erro: Limite de blocos da Blockchain atingido!\n");
+        return;
+    }
+
+    Bloco *novo_bloco = &blockchain[proximo_id];
+
+    // 1. Atribui os dados e a referência ao bloco anterior
+    novo_bloco->id = proximo_id;
+    novo_bloco->hash_anterior = hash_anterior_atual;
+
+    // Copia os dados
+    strcpy(novo_bloco->Nome, nome);
+    novo_bloco->SN = sn;
+    strcpy(novo_bloco->Data, data);
+    strcpy(novo_bloco->Modelo, modelo);
+    strcpy(novo_bloco->Motivo, motivo);
+    strcpy(novo_bloco->Destino, destino);
+
+    // 2. Calcula o HASH deste novo bloco (inclui a referência ao Hash Anterior)
+    novo_bloco->hash_atual = calcularHashBloco(novo_bloco);
+
+    // 3. Atualiza o estado da Blockchain para o próximo bloco
+    hash_anterior_atual = novo_bloco->hash_atual;
+    proximo_id++;
+}
+
+// --- FUNÇÃO PARA INICIALIZAR O PRIMEIRO BLOCO (GÊNESIS) ---
+void iniciarBlockchain() {
+    printf("Iniciando Blockchain...\n");
+    // O Bloco Gênesis (ID 0) não tem um Hash Anterior, então passamos 0
+    adicionarNovoBloco("Genesis", 0, "00/00/0000", "INICIAL", "CONFIG", "N/A");
+    printf("Bloco Gênesis (ID 0) criado com Hash: %d\n\n", blockchain[0].hash_atual);
+}
+
+// --- FUNÇÃO PARA MOSTRAR TODOS OS REGISTROS ---
+void visualizarBlockchain(char *senha_correta) {
+    printf("Você tem apenas 3 chances\n");
+
+    // Faz a validação da senha do programa
+    while(QtdTentativa < 4 && strcmp(Tentativa, senha_correta) != 0){
+        printf("Digite a senha cadastrada para ter acesso às informações da Blockchain:\n");
+        scanf("%s", Tentativa);
+
+        if(strcmp(Tentativa, senha_correta) == 0){
+            // ACERTOU A SENHA: Exibe os dados ORIGINAIS
+            system("clear||cls");
+            printf("\n********** BLOCKCHAIN REGISTROS DE DESCARTE (%d Blocos) ************\n", proximo_id);
+            for (int i = 0; i < proximo_id; i++) {
+                Bloco *b = &blockchain[i];
+                printf("\n--- Bloco %d ---\n", b->id);
+                printf("  [HASH ANTERIOR]: %d\n", b->hash_anterior);
+                printf("  [HASH ATUAL]: %d\n", b->hash_atual);
+                printf("  - Produto: %s (SN: %d)\n", b->Nome, b->SN);
+                printf("  - Modelo: %s\n", b->Modelo);
+                printf("  - Data/Motivo/Destino: %s / %s / %s\n", b->Data, b->Motivo, b->Destino);
+            }
+            QtdTentativa = 4; // Sai do loop após acertar
+
+        } else if(QtdTentativa >= 3){
+            // ERROU PELA ÚLTIMA VEZ: Acesso negado e encerra
+            system("clear||cls");
+            printf("Limite de tentativas excedido, acesso negado à Blockchain!!\n");
+
+        } else {
+            // ERROU, TENTE NOVAMENTE
+            printf("Você digitou a senha errada, tente novamente. Tentativa %d de 3.\n", QtdTentativa);
+        }
+        QtdTentativa++;
+    }
+}
+
+
+//O programa de fato se inicia AQUI
+int main(void) {
+    // Inicializa a cadeia com o Bloco Gênesis
+    iniciarBlockchain();
+
+    char Modelo_temp[100], Motivo_temp[100], Destino_temp[100], Data_temp[10], Nome_temp[100];
+    int SN_temp;
+
+    printf("Crie uma senha para acessar os registros da Blockchain: ");
+    scanf("%s", Senha);
+
+    // Loop principal de Cadastro
+    do {
+      //código serve para limpar o console após a execução do código
+        system("clear||cls");
+        printf("\n--- NOVO CADASTRO DE DESCARTE (Bloco %d) ---\n", proximo_id);
+
+      // faz uma série de solicitações de informações
+        printf("\nQual o produto que está sendo descartado? ");
+        scanf("%s", Nome_temp);
+        printf("\nQual o número de série do produto? ");
+        scanf("%d", &SN_temp);
+        printf("\nQual a data da entrega?(Coloque no formato dd/mm/aaaa): \n");
+        scanf("%s", Data_temp);
+        printf("\nQual a marca e o modelo do produto? ");
+        scanf("%s", Modelo_temp);
+        printf("\nQual o motivo do descarte? ");
+        scanf("%s", Motivo_temp);
+        printf("\nQual o destino do produto enviado?(Reciclagem ou Destruição) ");
+        scanf("%s", Destino_temp);
+
+      // Faz a confirmação e validação desses dados junto ao usuário
+        printf("\nOs dados inseridos para o Bloco %d estão corretos?\n1. Sim\n2. Não\n", proximo_id);
+        scanf("%d", &confirmacao);
+
+      // inicia o menu de opções ao usuário
+        if (confirmacao == 1) {
+            adicionarNovoBloco(Nome_temp, SN_temp, Data_temp, Modelo_temp, Motivo_temp, Destino_temp);
+            printf("\nInformações validadas e adicionado à Blockchain com sucesso!\n");
+
+            printf("\nEscolha como prosseguir:\n1. Visualizar todos os registros da Blockchain\n2. Fazer outro cadastro (Novo Bloco)\n3. Encerrar o programa\n");
+            scanf("%d", &confirmacao2);
+
+            if (confirmacao2 == 1) {
+                visualizarBlockchain(Senha);
+                // Resetar QtdTentativa para um próximo acesso
+                QtdTentativa = 1; 
+                printf("\n\n1. Fazer outro cadastro (Novo Bloco)\n3. Encerrar o programa\n");
+                scanf("%d", &confirmacao2);
+            }
+        } else if (confirmacao == 2) {
+            printf("\nInfelizmente blockchains não permitem alterações. Este registro foi descartado. Refaça o cadastro do produto.\n");
+            confirmacao2 = 2; // Volta para o loop de novo cadastro
+        } else {
+            printf("\nComando inválido. Reinicie o programa.\n");
+            confirmacao2 = 3; // Encerra
+        }
+
+    } while (confirmacao2 == 2);
+
+    sleep(1);
+    system("clear||cls");
+    printf("Programa encerrado com sucesso, obrigado por contribuir para um mundo melhor!!!\n");
+
+    return 0;
+}
